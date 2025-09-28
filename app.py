@@ -4,6 +4,7 @@ import openpyxl
 import json
 import os
 from datetime import datetime
+import io
 
 app = Flask(__name__)
 CORS(app)
@@ -12,13 +13,17 @@ CORS(app)
 DATOS_FILE = 'datos.json'
 
 def leer_excel_y_convertir(archivo_excel):
-    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN MEJORADA"""
+    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN CORREGIDA PARA RENDER"""
     try:
-        # Guardar archivo temporalmente
-        temp_path = "temp_excel.xlsx"
-        archivo_excel.save(temp_path)
+        # Leer directamente desde memoria sin guardar archivo temporal
+        archivo_excel.seek(0)  # Asegurar que estamos al inicio del archivo
+        file_content = archivo_excel.read()
         
-        workbook = openpyxl.load_workbook(temp_path, data_only=True)
+        # Crear objeto BytesIO para openpyxl
+        excel_file = io.BytesIO(file_content)
+        
+        # Cargar workbook directamente desde memoria
+        workbook = openpyxl.load_workbook(excel_file, data_only=True)
         
         datos = {
             'fecha_actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -38,45 +43,66 @@ def leer_excel_y_convertir(archivo_excel):
             if sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
                 
-                # Leer headers (primera fila)
+                # Verificar que la hoja no esté vacía
+                if sheet.max_row < 2:
+                    print(f"Advertencia: La hoja {sheet_name} está vacía o solo tiene headers")
+                    continue
+                
+                # Leer headers (primera fila) - mejorado
                 headers = []
-                for cell in sheet[1]:
-                    header_value = str(cell.value) if cell.value is not None else f'columna_{len(headers) + 1}'
-                    headers.append(header_value)
+                header_row = sheet[1]
+                for i, cell in enumerate(header_row):
+                    if cell.value is not None:
+                        header_value = str(cell.value).strip()
+                        if header_value:
+                            headers.append(header_value)
+                        else:
+                            headers.append(f'columna_{i + 1}')
+                    else:
+                        headers.append(f'columna_{i + 1}')
+                
+                print(f"Headers encontrados en {sheet_name}: {headers}")
                 
                 # Leer datos (desde fila 2 en adelante)
                 sheet_data = []
-                for row in sheet.iter_rows(min_row=2, values_only=True):
-                    if any(cell is not None and cell != '' for cell in row):
-                        row_dict = {}
-                        for i, value in enumerate(row):
-                            if i < len(headers):
-                                if value is None:
-                                    cleaned_value = ''
-                                else:
-                                    cleaned_value = str(value)
-                                    # Mantener formato original, solo limpiar básico
-                                    cleaned_value = cleaned_value.replace('\r\n', ' ').replace('\n', ' ')
-                                row_dict[headers[i]] = cleaned_value
-                        
-                        if row_dict:
-                            sheet_data.append(row_dict)
+                for row_num in range(2, sheet.max_row + 1):
+                    row = sheet[row_num]
+                    
+                    # Verificar que la fila no esté completamente vacía
+                    row_values = [cell.value for cell in row]
+                    if not any(val is not None and str(val).strip() != '' for val in row_values):
+                        continue
+                    
+                    row_dict = {}
+                    for i, cell in enumerate(row):
+                        if i < len(headers):
+                            value = cell.value
+                            if value is None:
+                                cleaned_value = ''
+                            else:
+                                cleaned_value = str(value).strip()
+                                # Limpiar saltos de línea pero mantener formato
+                                cleaned_value = cleaned_value.replace('\r\n', ' ').replace('\n', ' ')
+                            
+                            row_dict[headers[i]] = cleaned_value
+                    
+                    # Solo agregar si hay al menos un valor no vacío
+                    if any(val.strip() for val in row_dict.values() if val):
+                        sheet_data.append(row_dict)
                 
                 datos[data_key] = sheet_data
+                print(f"Procesados {len(sheet_data)} registros de {sheet_name}")
         
-        # Limpiar archivo temporal
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-            
+        # Cerrar el workbook
+        workbook.close()
+        
         return datos
         
     except Exception as e:
-        # Limpiar archivo temporal en caso de error
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.remove(temp_path)
+        print(f"Error detallado procesando Excel: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise Exception(f"Error procesando Excel: {str(e)}")
-
-# ... (el resto del código IGUAL que tu versión original que funcionaba en tu PC)
 
 @app.route('/')
 def home():
@@ -100,6 +126,7 @@ def admin():
             .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
             .info { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
+            .debug { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; font-family: monospace; font-size: 12px; }
         </style>
     </head>
     <body>
@@ -119,6 +146,7 @@ def admin():
         <div style="margin-top: 30px;">
             <h3>Enlaces útiles:</h3>
             <p><a href="/api/datos" target="_blank">Ver datos JSON</a></p>
+            <p><a href="/api/debug" target="_blank">Debug info</a></p>
             <p><strong>URL del boletín para empleados:</strong><br>
             <code>https://tracinda-boletin.onrender.com/api/datos</code></p>
         </div>
@@ -154,6 +182,9 @@ def admin():
                             TFN-CNCAF: ${data.total_tfn_cncaf} registros<br>
                             TFN-CNCAF-CSJN: ${data.total_tfn_cncaf_csjn} registros
                         </div>`;
+                        if (data.debug_info) {
+                            statusDiv.innerHTML += `<div class="debug">Debug: ${data.debug_info}</div>`;
+                        }
                         fileInput.value = '';
                     }
                 })
@@ -180,6 +211,8 @@ def subir_archivo():
         if not archivo.filename.endswith(('.xlsx', '.xls')):
             return jsonify({'error': 'Solo se permiten archivos Excel (.xlsx, .xls)'}), 400
         
+        print(f"Procesando archivo: {archivo.filename}")
+        
         # Procesar Excel
         datos = leer_excel_y_convertir(archivo)
         
@@ -187,16 +220,27 @@ def subir_archivo():
         with open(DATOS_FILE, 'w', encoding='utf-8') as f:
             json.dump(datos, f, ensure_ascii=False, indent=2)
         
+        print("Archivo JSON guardado exitosamente")
+        
         # Respuesta con estadísticas
-        return jsonify({
+        response_data = {
             'mensaje': 'Archivo procesado exitosamente',
             'fecha_actualizacion': datos['fecha_actualizacion'],
             'total_tfn': len(datos['tfn']),
             'total_tfn_cncaf': len(datos['tfn_cncaf']),
             'total_tfn_cncaf_csjn': len(datos['tfn_cncaf_csjn'])
-        })
+        }
+        
+        # Agregar info de debug
+        debug_info = f"TFN: {len(datos['tfn'])}, TFN_CNCAF: {len(datos['tfn_cncaf'])}, TFN_CNCAF_CSJN: {len(datos['tfn_cncaf_csjn'])}"
+        response_data['debug_info'] = debug_info
+        
+        return jsonify(response_data)
         
     except Exception as e:
+        print(f"Error en subir_archivo: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/datos')
@@ -212,7 +256,34 @@ def obtener_datos():
         return jsonify(datos)
         
     except Exception as e:
+        print(f"Error en obtener_datos: {str(e)}")
         return jsonify({'error': f'Error cargando datos: {str(e)}'}), 500
+
+@app.route('/api/debug')
+def debug_info():
+    """Endpoint para debugging"""
+    info = {
+        'archivo_existe': os.path.exists(DATOS_FILE),
+        'directorio_actual': os.getcwd(),
+        'archivos_en_directorio': os.listdir('.'),
+        'python_version': os.sys.version,
+        'render_environment': 'RENDER' in os.environ
+    }
+    
+    if os.path.exists(DATOS_FILE):
+        try:
+            with open(DATOS_FILE, 'r', encoding='utf-8') as f:
+                datos = json.load(f)
+            info['datos_stats'] = {
+                'fecha_actualizacion': datos.get('fecha_actualizacion', 'N/A'),
+                'tfn_count': len(datos.get('tfn', [])),
+                'tfn_cncaf_count': len(datos.get('tfn_cncaf', [])),
+                'tfn_cncaf_csjn_count': len(datos.get('tfn_cncaf_csjn', []))
+            }
+        except Exception as e:
+            info['error_leyendo_datos'] = str(e)
+    
+    return jsonify(info)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
