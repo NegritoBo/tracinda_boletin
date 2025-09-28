@@ -1,10 +1,12 @@
-from flask import Flask, request, jsonify, render_template_string
+ from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 import openpyxl
 import json
 import os
 from datetime import datetime
 import io
+import gzip
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -13,7 +15,7 @@ CORS(app)
 DATOS_FILE = 'datos.json'
 
 def leer_excel_y_convertir(archivo_excel):
-    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN CORREGIDA PARA RENDER"""
+    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN OPTIMIZADA"""
     try:
         # Leer directamente desde memoria sin guardar archivo temporal
         archivo_excel.seek(0)  # Asegurar que estamos al inicio del archivo
@@ -65,6 +67,8 @@ def leer_excel_y_convertir(archivo_excel):
                 
                 # Leer datos (desde fila 2 en adelante)
                 sheet_data = []
+                processed_rows = 0
+                
                 for row_num in range(2, sheet.max_row + 1):
                     row = sheet[row_num]
                     
@@ -81,17 +85,21 @@ def leer_excel_y_convertir(archivo_excel):
                                 cleaned_value = ''
                             else:
                                 cleaned_value = str(value).strip()
-                                # Limpiar saltos de línea pero mantener formato
+                                # Limpiar y truncar texto muy largo para evitar problemas
                                 cleaned_value = cleaned_value.replace('\r\n', ' ').replace('\n', ' ')
+                                # Truncar si es muy largo (más de 10000 caracteres)
+                                if len(cleaned_value) > 10000:
+                                    cleaned_value = cleaned_value[:10000] + "... [TRUNCADO]"
                             
                             row_dict[headers[i]] = cleaned_value
                     
                     # Solo agregar si hay al menos un valor no vacío
                     if any(val.strip() for val in row_dict.values() if val):
                         sheet_data.append(row_dict)
+                        processed_rows += 1
                 
                 datos[data_key] = sheet_data
-                print(f"Procesados {len(sheet_data)} registros de {sheet_name}")
+                print(f"Procesados {processed_rows} registros de {sheet_name}")
         
         # Cerrar el workbook
         workbook.close()
@@ -103,6 +111,18 @@ def leer_excel_y_convertir(archivo_excel):
         import traceback
         traceback.print_exc()
         raise Exception(f"Error procesando Excel: {str(e)}")
+
+def comprimir_datos(datos):
+    """Comprime los datos usando gzip"""
+    json_str = json.dumps(datos, ensure_ascii=False, separators=(',', ':'))
+    compressed = gzip.compress(json_str.encode('utf-8'))
+    return base64.b64encode(compressed).decode('ascii')
+
+def descomprimir_datos(compressed_data):
+    """Descomprime los datos"""
+    compressed_bytes = base64.b64decode(compressed_data.encode('ascii'))
+    json_str = gzip.decompress(compressed_bytes).decode('utf-8')
+    return json.loads(json_str)
 
 @app.route('/')
 def home():
@@ -118,7 +138,7 @@ def admin():
         <title>Admin - Boletín de Trazabilidad</title>
         <meta charset="UTF-8">
         <style>
-            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
             .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px 0; border-radius: 10px; }
             button { background: #007cba; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
             button:hover { background: #005a8b; }
@@ -126,7 +146,8 @@ def admin():
             .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
             .info { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
-            .debug { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; font-family: monospace; font-size: 12px; }
+            .debug { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+            .json-preview { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
         </style>
     </head>
     <body>
@@ -146,9 +167,9 @@ def admin():
         <div style="margin-top: 30px;">
             <h3>Enlaces útiles:</h3>
             <p><a href="/api/datos" target="_blank">Ver datos JSON</a></p>
+            <p><a href="/api/datos/compressed" target="_blank">Ver datos comprimidos</a></p>
             <p><a href="/api/debug" target="_blank">Debug info</a></p>
-            <p><strong>URL del boletín para empleados:</strong><br>
-            <code>https://tracinda-boletin.onrender.com/api/datos</code></p>
+            <p><a href="/api/stats" target="_blank">Estadísticas</a></p>
         </div>
         
         <script>
@@ -175,16 +196,20 @@ def admin():
                     if (data.error) {
                         statusDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
                     } else {
-                        statusDiv.innerHTML = `<div class="success">
+                        let html = `<div class="success">
                             ✓ Archivo procesado exitosamente<br>
                             Fecha: ${data.fecha_actualizacion}<br>
                             TFN: ${data.total_tfn} registros<br>
                             TFN-CNCAF: ${data.total_tfn_cncaf} registros<br>
-                            TFN-CNCAF-CSJN: ${data.total_tfn_cncaf_csjn} registros
+                            TFN-CNCAF-CSJN: ${data.total_tfn_cncaf_csjn} registros<br>
+                            Tamaño del archivo: ${data.file_size_mb} MB
                         </div>`;
-                        if (data.debug_info) {
-                            statusDiv.innerHTML += `<div class="debug">Debug: ${data.debug_info}</div>`;
+                        
+                        if (data.sample_data) {
+                            html += `<div class="debug">Muestra de datos procesados:<br>${JSON.stringify(data.sample_data, null, 2)}</div>`;
                         }
+                        
+                        statusDiv.innerHTML = html;
                         fileInput.value = '';
                     }
                 })
@@ -216,11 +241,31 @@ def subir_archivo():
         # Procesar Excel
         datos = leer_excel_y_convertir(archivo)
         
-        # Guardar en archivo JSON
+        # Calcular tamaño del JSON
+        json_str = json.dumps(datos, ensure_ascii=False, indent=2)
+        json_size_mb = len(json_str.encode('utf-8')) / (1024 * 1024)
+        
+        print(f"Tamaño del JSON: {json_size_mb:.2f} MB")
+        
+        # Guardar datos normales
         with open(DATOS_FILE, 'w', encoding='utf-8') as f:
             json.dump(datos, f, ensure_ascii=False, indent=2)
         
-        print("Archivo JSON guardado exitosamente")
+        # Guardar versión comprimida también
+        compressed_data = comprimir_datos(datos)
+        with open(DATOS_FILE + '.compressed', 'w', encoding='utf-8') as f:
+            f.write(compressed_data)
+        
+        print("Archivos guardados exitosamente")
+        
+        # Crear muestra de datos para debug
+        sample_data = {}
+        for key, value in datos.items():
+            if key != 'fecha_actualizacion' and isinstance(value, list) and len(value) > 0:
+                sample_data[key] = {
+                    'primer_registro': value[0] if value else None,
+                    'total_registros': len(value)
+                }
         
         # Respuesta con estadísticas
         response_data = {
@@ -228,12 +273,10 @@ def subir_archivo():
             'fecha_actualizacion': datos['fecha_actualizacion'],
             'total_tfn': len(datos['tfn']),
             'total_tfn_cncaf': len(datos['tfn_cncaf']),
-            'total_tfn_cncaf_csjn': len(datos['tfn_cncaf_csjn'])
+            'total_tfn_cncaf_csjn': len(datos['tfn_cncaf_csjn']),
+            'file_size_mb': round(json_size_mb, 2),
+            'sample_data': sample_data
         }
-        
-        # Agregar info de debug
-        debug_info = f"TFN: {len(datos['tfn'])}, TFN_CNCAF: {len(datos['tfn_cncaf'])}, TFN_CNCAF_CSJN: {len(datos['tfn_cncaf_csjn'])}"
-        response_data['debug_info'] = debug_info
         
         return jsonify(response_data)
         
@@ -259,11 +302,56 @@ def obtener_datos():
         print(f"Error en obtener_datos: {str(e)}")
         return jsonify({'error': f'Error cargando datos: {str(e)}'}), 500
 
+@app.route('/api/datos/compressed')
+def obtener_datos_comprimidos():
+    """Endpoint que devuelve los datos comprimidos"""
+    try:
+        compressed_file = DATOS_FILE + '.compressed'
+        if not os.path.exists(compressed_file):
+            return jsonify({'error': 'No hay datos comprimidos disponibles.'}), 404
+        
+        with open(compressed_file, 'r', encoding='utf-8') as f:
+            compressed_data = f.read()
+        
+        datos = descomprimir_datos(compressed_data)
+        return jsonify(datos)
+        
+    except Exception as e:
+        print(f"Error en obtener_datos_comprimidos: {str(e)}")
+        return jsonify({'error': f'Error cargando datos comprimidos: {str(e)}'}), 500
+
+@app.route('/api/stats')
+def obtener_estadisticas():
+    """Endpoint que devuelve solo estadísticas sin los datos completos"""
+    try:
+        if not os.path.exists(DATOS_FILE):
+            return jsonify({'error': 'No hay datos disponibles.'}), 404
+        
+        with open(DATOS_FILE, 'r', encoding='utf-8') as f:
+            datos = json.load(f)
+        
+        # Solo devolver estadísticas y primeros registros
+        stats = {
+            'fecha_actualizacion': datos.get('fecha_actualizacion'),
+            'total_tfn': len(datos.get('tfn', [])),
+            'total_tfn_cncaf': len(datos.get('tfn_cncaf', [])),
+            'total_tfn_cncaf_csjn': len(datos.get('tfn_cncaf_csjn', [])),
+            'muestra_tfn': datos.get('tfn', [])[:2],  # Solo primeros 2 registros
+            'muestra_tfn_cncaf': datos.get('tfn_cncaf', [])[:2],
+            'muestra_tfn_cncaf_csjn': datos.get('tfn_cncaf_csjn', [])[:2]
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({'error': f'Error cargando estadísticas: {str(e)}'}), 500
+
 @app.route('/api/debug')
 def debug_info():
     """Endpoint para debugging"""
     info = {
         'archivo_existe': os.path.exists(DATOS_FILE),
+        'archivo_comprimido_existe': os.path.exists(DATOS_FILE + '.compressed'),
         'directorio_actual': os.getcwd(),
         'archivos_en_directorio': os.listdir('.'),
         'python_version': os.sys.version,
@@ -272,6 +360,9 @@ def debug_info():
     
     if os.path.exists(DATOS_FILE):
         try:
+            file_size = os.path.getsize(DATOS_FILE)
+            info['archivo_size_mb'] = round(file_size / (1024 * 1024), 2)
+            
             with open(DATOS_FILE, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
             info['datos_stats'] = {
