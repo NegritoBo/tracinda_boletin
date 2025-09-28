@@ -32,7 +32,7 @@ def leer_excel_y_convertir(archivo_excel):
             'tfn_cncaf_csjn': []
         }
         
-        # Procesar cada hoja (mantengo tu lógica original)
+        # Procesar cada hoja
         sheet_mapping = {
             'TFN': 'tfn',
             'TFN_CNCAF': 'tfn_cncaf', 
@@ -43,12 +43,12 @@ def leer_excel_y_convertir(archivo_excel):
             if sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
                 
-                # Leer headers (primera fila) - tu lógica original
+                # Leer headers (primera fila)
                 headers = []
                 for cell in sheet[1]:
                     headers.append(cell.value or '')
                 
-                # Leer datos (desde fila 2 en adelante) - tu lógica original
+                # Leer datos (desde fila 2 en adelante)
                 sheet_data = []
                 for row in sheet.iter_rows(min_row=2, values_only=True):
                     if any(cell for cell in row if cell):  # Si la fila tiene datos
@@ -110,13 +110,10 @@ def admin():
             <p><a href="/api/datos" target="_blank">Ver datos JSON</a></p>
             <p><a href="/api/test" target="_blank">Test de funcionalidad</a></p>
             <p><strong>URL del API:</strong><br>
-            <code id="api-url"></code></p>
+            <code>https://tracinda-boletin.onrender.com/api/datos</code></p>
         </div>
         
         <script>
-            // Mostrar la URL actual
-            document.getElementById('api-url').textContent = window.location.origin + '/api/datos';
-            
             function subirArchivo() {
                 const fileInput = document.getElementById('fileInput');
                 const statusDiv = document.getElementById('status');
