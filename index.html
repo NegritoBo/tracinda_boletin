@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang='es'>
+<head>
+<meta charset='UTF-8'/>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+<title>Boletín Informativo - Trazabilidad Sentencias TFN-CNCAF-CSJN</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root{
+  --base-font: 14px;
+  --line-height: 1.4;
+  --row-lines: 2;
+  --cell-padding-y: 10px;
+  --cell-padding-x: 10px;
+}
+body{
+    font-family:'Inter','Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height:var(--line-height); color:#1f2937;
+    background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height:100vh; padding:20px; font-size:var(--base-font);
+}
+.container{
+    max-width:1400px; margin:0 auto; background:#fff;
+    border-radius:14px; box-shadow:0 20px 40px rgba(31,41,55,.12); overflow:hidden;
+}
+.header{
+    background:linear-gradient(135deg,#1f2937 0%,#374151 100%);
+    color:#fff; padding:22px 28px; text-align:center;
+}
+.header h1{ font-size:24px; margin-bottom:6px; font-weight:500; letter-spacing:.2px; }
+.header .subtitle{ font-size:14px; opacity:.9; font-weight:400; }
+
+.loading{
+    text-align:center; padding:40px; color:#6b7280;
+    font-style:italic;
+}
+
+.error{
+    background:#fef2f2; border:1px solid #fecaca; color:#dc2626;
+    padding:15px; margin:20px; border-radius:8px; text-align:center;
+}
+
+.content{ padding:22px 24px; }
+.section{ margin-bottom:36px; }
+.section-title{
+    font-size:16px; color:#111827; margin-bottom:14px;
+    padding-bottom:8px; border-bottom:2px solid #6366f1; font-weight:600;
+}
+
+.table-container{ overflow-x:auto; border-radius:10px; border:1px solid #e5e7eb; }
+.data-table{ width:100%; border-collapse:separate; border-spacing:0; background:#fff; table-layout:fixed; }
+.data-table thead th{
+    position:sticky; top:0; z-index:5;
+    background:linear-gradient(135deg,#6366f1 0%,#7c3aed 100%);
+    color:#fff; padding:10px var(--cell-padding-x); text-align:left; font-weight:600; font-size:12px;
+    border-right:1px solid rgba(255,255,255,.15);
+}
+.data-table thead th:last-child{ border-right:none; }
+
+.data-table td{
+    padding: var(--cell-padding-y) var(--cell-padding-x);
+    border-bottom:1px solid #f3f4f6; border-right:1px solid #f3f4f6;
+    vertical-align:middle; font-size:13px; color:#374151; background:#fff;
+    line-height: var(--line-height);
+    height: calc(var(--line-height) * var(--row-lines) * 1em + var(--cell-padding-y) * 2);
+}
+.data-table td:last-child{ border-right:none; }
+
+.cell-text{
+  display:-webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--row-lines);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+  word-break:break-word;
+}
+
+.align-left{ text-align:left; }
+.align-center{ text-align:center; }
+.align-right{ text-align:right; }
+
+.data-table tr:nth-child(even) td{ background:#fafafa; }
+.data-table tbody tr:hover td{ background:#f1f5ff; transition:background-color .2s ease; }
+
+.btn-link{
+  display:inline-block; padding:6px 10px; border-radius:8px;
+  background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3;
+  font-weight:600; text-decoration:none; font-size:12px;
+}
+.btn-link:hover{ background:#e0e7ff; }
+
+.muted{ color:#9ca3af; font-style:italic; }
+
+.note{
+    margin-top:16px; padding:12px 14px; background:#f8fafc;
+    border-left:4px solid #6366f1; border-radius:8px; font-size:12.5px; color:#4b5563;
+}
+.small{ font-size:12px; color:#6b7280; margin-top:8px; }
+
+.empty-table{
+    text-align:center; padding:40px; color:#9ca3af; font-style:italic;
+}
+</style>
+
+</head>
+<body>
+<div class='container'>
+<div class='header'>
+<h1>Boletín Informativo</h1>
+<div class='subtitle'>Trazabilidad de Sentencias TFN — CNCAF — CSJN</div>
+</div>
+
+<div id='loading' class='loading'>
+Cargando datos del boletín...
+</div>
+
+<div id='error' class='error' style='display:none;'></div>
+
+<div id='content' class='content' style='display:none;'>
+
+<div class='section'>
+<h2 class='section-title'>TFN (Sentencias Nuevas)</h2>
+<div class='table-container'>
+<table class='data-table'>
+<thead>
+<tr>
+<th class='align-left'>Carátula TFN</th>
+<th class='align-left'>Expediente TFN</th>
+<th class='align-left'>Competencia TFN</th>
+<th class='align-center'>Sala TFN</th>
+<th class='align-center'>Vocalía TFN</th>
+<th class='align-left'>Resuelve TFN</th>
+<th class='align-left'>Tema TFN</th>
+</tr>
+</thead>
+<tbody id='tbody-tfn'>
+</tbody>
+</table>
+</div>
+<div class='small'>Filas: <span id='count-tfn'>0</span> — Consejo: pasa el mouse para ver el tooltip con el texto completo.</div>
+</div>
+
+<div class='section'>
+<h2 class='section-title'>Trazabilidad TFN — CNCAF</h2>
+<div class='table-container'>
+<table class='data-table'>
+<thead>
+<tr>
+<th class='align-left'>Expediente TFN</th>
+<th class='align-left'>Competencia TFN</th>
+<th class='align-center'>Sala TFN</th>
+<th class='align-center'>Vocalía TFN</th>
+<th class='align-left'>Resuelve TFN</th>
+<th class='align-left'>Tema TFN</th>
+<th class='align-left'>Carátula CNCAF</th>
+<th class='align-center'>Fecha CNCAF</th>
+<th class='align-center'>Sala CNCAF</th>
+<th class='align-left'>Expediente CNCAF</th>
+<th class='align-left'>Descarga CNCAF</th>
+<th class='align-left'>Resuelve CNCAF</th>
+</tr>
+</thead>
+<tbody id='tbody-cncaf'>
+</tbody>
+</table>
+</div>
+<div class='small'>Filas: <span id='count-cncaf'>0</span> — Consejo: pasa el mouse para ver el tooltip con el texto completo.</div>
+</div>
+
+<div class='section'>
+<h2 class='section-title'>Trazabilidad TFN — CNCAF — CSJN</h2>
+<div class='table-container'>
+<table class='data-table'>
+<thead>
+<tr>
+<th class='align-left'>Carátula CSJN</th>
+<th class='align-center'>Fecha CSJN</th>
+<th class='align-left'>Resuelve CSJN</th>
+<th class='align-left'>Más Info CSJN</th>
+<th class='align-center'>Votos CSJN</th>
+<th class='align-left'>Descarga CSJN</th>
+<th class='align-left'>Expediente CNCAF</th>
+<th class='align-left'>Expediente TFN</th>
+</tr>
+</thead>
+<tbody id='tbody-csjn'>
+</tbody>
+</table>
+</div>
+<div class='small'>Filas: <span id='count-csjn'>0</span> — Consejo: pasa el mouse para ver el tooltip con el texto completo.</div>
+</div>
+
+<div class='note'>
+<strong>Nota:</strong> Para normalizar visualmente, se truncó el texto a 2 líneas por celda con tooltip al pasar el mouse. 
+Los datos se actualizan diariamente con información del día anterior.
+<div style='margin-top:8px;'>
+<strong>Última actualización:</strong> <span id='fecha-actualizacion'>--</span>
+</div>
+</div>
+
+</div>
+</div>
+
+<script>
+// CORREGIDO: URL de tu backend en Render
+const BACKEND_URL = 'https://tracinda-boletin.onrender.com';
+
+// Cargar datos al cargar la página
+document.addEventListener('DOMContentLoaded', cargarDatos);
+
+async function cargarDatos() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/datos`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            mostrarDatos(data);
+        } else {
+            mostrarError(data.error || 'Error cargando datos');
+        }
+    } catch (error) {
+        mostrarError('Error de conexión con el servidor');
+    }
+}
+
+function mostrarDatos(data) {
+    // Ocultar loading y error
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    
+    // Llenar tablas
+    llenarTablaTFN(data.tfn || []);
+    llenarTablaCNCAF(data.tfn_cncaf || []);
+    llenarTablaCSJN(data.tfn_cncaf_csjn || []);
+    
+    // Mostrar fecha de actualización
+    document.getElementById('fecha-actualizacion').textContent = data.fecha_actualizacion || '--';
+}
+
+function mostrarError(mensaje) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent = mensaje;
+    document.getElementById('content').style.display = 'none';
+}
+
+function llenarTablaTFN(datos) {
+    const tbody = document.getElementById('tbody-tfn');
+    tbody.innerHTML = '';
+    
+    if (datos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-table">No hay datos disponibles</td></tr>';
+        document.getElementById('count-tfn').textContent = '0';
+        return;
+    }
+    
+    datos.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Caratula_TFN || '')}'>${truncarTexto(item.Caratula_TFN || '')}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Expediente_TFN || '')}'>${item.Expediente_TFN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Competencia_TFN || '')}'>${item.Competencia_TFN || ''}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Sala_TFN || '')}'>${item.Sala_TFN || ''}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Vocalia_TFN || '')}'>${item.Vocalia_TFN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Resuelve_TFN || '')}'>${truncarTexto(item.Resuelve_TFN || '')}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Tema_TFN || '')}'>${item.Tema_TFN || ''}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('count-tfn').textContent = datos.length;
+}
+
+function llenarTablaCNCAF(datos) {
+    const tbody = document.getElementById('tbody-cncaf');
+    tbody.innerHTML = '';
+    
+    if (datos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" class="empty-table">No hay datos disponibles</td></tr>';
+        document.getElementById('count-cncaf').textContent = '0';
+        return;
+    }
+    
+    datos.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Expediente_TFN || '')}'>${item.Expediente_TFN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Competencia_TFN || '')}'>${item.Competencia_TFN || ''}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Sala_TFN || '')}'>${item.Sala_TFN || ''}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Vocalia_TFN || '')}'>${item.Vocalia_TFN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Resuelve_TFN || '')}'>${truncarTexto(item.Resuelve_TFN || '')}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Tema_TFN || '')}'>${item.Tema_TFN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Caratula_CNCAF || '')}'>${truncarTexto(item.Caratula_CNCAF || '')}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Fecha_CNCAF || '')}'>${formatearFecha(item.Fecha_CNCAF || '')}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Sala_CNCAF || '')}'>${item.Sala_CNCAF || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Expediente_CNCAF || '')}'>${item.Expediente_CNCAF || ''}</span></td>
+            <td class='align-left'>${crearEnlace(item.Descarga_CNCAF)}</td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Resuelve_CNCAF || '')}'>${truncarTexto(item.Resuelve_CNCAF || '')}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('count-cncaf').textContent = datos.length;
+}
+
+function llenarTablaCSJN(datos) {
+    const tbody = document.getElementById('tbody-csjn');
+    tbody.innerHTML = '';
+    
+    if (datos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-table">No hay datos disponibles</td></tr>';
+        document.getElementById('count-csjn').textContent = '0';
+        return;
+    }
+    
+    datos.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Caratula_CSJN || '')}'>${truncarTexto(item.Caratula_CSJN || '')}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Fecha_CSJN || '')}'>${formatearFecha(item.Fecha_CSJN || '')}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Resuelve_CSJN || '')}'>${item.Resuelve_CSJN || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.MasInfo_CSJN || '')}'>${truncarTexto(item.MasInfo_CSJN || '')}</span></td>
+            <td class='align-center'><span class='cell-text' title='${escapeHtml(item.Votos_CSJN || '')}'>${truncarTexto(item.Votos_CSJN || '')}</span></td>
+            <td class='align-left'>${crearEnlace(item.Descarga_CSJN)}</td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Expediente_CNCAF || '')}'>${item.Expediente_CNCAF || ''}</span></td>
+            <td class='align-left'><span class='cell-text' title='${escapeHtml(item.Expediente_TFN || '')}'>${item.Expediente_TFN || ''}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('count-csjn').textContent = datos.length;
+}
+
+// Funciones auxiliares
+function escapeHtml(texto) {
+    if (!texto) return '';
+    return texto.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function truncarTexto(texto, limite = 100) {
+    if (!texto) return '';
+    return texto.length > limite ? texto.substring(0, limite) + '...' : texto;
+}
+
+function formatearFecha(fecha) {
+    if (!fecha) return '';
+    try {
+        return new Date(fecha).toLocaleDateString('es-AR');
+    } catch {
+        return fecha;
+    }
+}
+
+function crearEnlace(url) {
+    if (!url) return '';
+    return `<a class="btn-link" href="${url}" target="_blank" rel="noopener">Ver</a>`;
+}
+</script>
+
+</body>
+</html>
