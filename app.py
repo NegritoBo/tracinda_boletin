@@ -5,8 +5,6 @@ import json
 import os
 from datetime import datetime
 import io
-import gzip
-import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -15,17 +13,17 @@ CORS(app)
 DATOS_FILE = 'datos.json'
 
 def leer_excel_y_convertir(archivo_excel):
-    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN OPTIMIZADA"""
+    """Convierte el Excel a formato JSON usando openpyxl - ADAPTADO PARA RENDER"""
     try:
-        # Leer directamente desde memoria sin guardar archivo temporal
-        archivo_excel.seek(0)  # Asegurar que estamos al inicio del archivo
+        # En lugar de pasar el archivo directamente, lo leemos en memoria
+        archivo_excel.seek(0)  # Ir al inicio del archivo
         file_content = archivo_excel.read()
         
-        # Crear objeto BytesIO para openpyxl
-        excel_file = io.BytesIO(file_content)
+        # Crear un objeto BytesIO para simular un archivo
+        excel_buffer = io.BytesIO(file_content)
         
-        # Cargar workbook directamente desde memoria
-        workbook = openpyxl.load_workbook(excel_file, data_only=True)
+        # Cargar el workbook desde el buffer
+        workbook = openpyxl.load_workbook(excel_buffer, data_only=True)
         
         datos = {
             'fecha_actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -34,7 +32,7 @@ def leer_excel_y_convertir(archivo_excel):
             'tfn_cncaf_csjn': []
         }
         
-        # Procesar cada hoja
+        # Procesar cada hoja (mantengo tu lógica original)
         sheet_mapping = {
             'TFN': 'tfn',
             'TFN_CNCAF': 'tfn_cncaf', 
@@ -45,84 +43,29 @@ def leer_excel_y_convertir(archivo_excel):
             if sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
                 
-                # Verificar que la hoja no esté vacía
-                if sheet.max_row < 2:
-                    print(f"Advertencia: La hoja {sheet_name} está vacía o solo tiene headers")
-                    continue
-                
-                # Leer headers (primera fila) - mejorado
+                # Leer headers (primera fila) - tu lógica original
                 headers = []
-                header_row = sheet[1]
-                for i, cell in enumerate(header_row):
-                    if cell.value is not None:
-                        header_value = str(cell.value).strip()
-                        if header_value:
-                            headers.append(header_value)
-                        else:
-                            headers.append(f'columna_{i + 1}')
-                    else:
-                        headers.append(f'columna_{i + 1}')
+                for cell in sheet[1]:
+                    headers.append(cell.value or '')
                 
-                print(f"Headers encontrados en {sheet_name}: {headers}")
-                
-                # Leer datos (desde fila 2 en adelante)
+                # Leer datos (desde fila 2 en adelante) - tu lógica original
                 sheet_data = []
-                processed_rows = 0
-                
-                for row_num in range(2, sheet.max_row + 1):
-                    row = sheet[row_num]
-                    
-                    # Verificar que la fila no esté completamente vacía
-                    row_values = [cell.value for cell in row]
-                    if not any(val is not None and str(val).strip() != '' for val in row_values):
-                        continue
-                    
-                    row_dict = {}
-                    for i, cell in enumerate(row):
-                        if i < len(headers):
-                            value = cell.value
-                            if value is None:
-                                cleaned_value = ''
-                            else:
-                                cleaned_value = str(value).strip()
-                                # Limpiar y truncar texto muy largo para evitar problemas
-                                cleaned_value = cleaned_value.replace('\r\n', ' ').replace('\n', ' ')
-                                # Truncar si es muy largo (más de 10000 caracteres)
-                                if len(cleaned_value) > 10000:
-                                    cleaned_value = cleaned_value[:10000] + "... [TRUNCADO]"
-                            
-                            row_dict[headers[i]] = cleaned_value
-                    
-                    # Solo agregar si hay al menos un valor no vacío
-                    if any(val.strip() for val in row_dict.values() if val):
-                        sheet_data.append(row_dict)
-                        processed_rows += 1
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    if any(cell for cell in row if cell):  # Si la fila tiene datos
+                        row_dict = {}
+                        for i, value in enumerate(row):
+                            if i < len(headers) and headers[i]:
+                                row_dict[headers[i]] = str(value) if value is not None else ''
+                        if row_dict:  # Solo agregar si tiene datos
+                            sheet_data.append(row_dict)
                 
                 datos[data_key] = sheet_data
-                print(f"Procesados {processed_rows} registros de {sheet_name}")
-        
-        # Cerrar el workbook
-        workbook.close()
         
         return datos
         
     except Exception as e:
-        print(f"Error detallado procesando Excel: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error detallado: {str(e)}")  # Para debugging en Render
         raise Exception(f"Error procesando Excel: {str(e)}")
-
-def comprimir_datos(datos):
-    """Comprime los datos usando gzip"""
-    json_str = json.dumps(datos, ensure_ascii=False, separators=(',', ':'))
-    compressed = gzip.compress(json_str.encode('utf-8'))
-    return base64.b64encode(compressed).decode('ascii')
-
-def descomprimir_datos(compressed_data):
-    """Descomprime los datos"""
-    compressed_bytes = base64.b64decode(compressed_data.encode('ascii'))
-    json_str = gzip.decompress(compressed_bytes).decode('utf-8')
-    return json.loads(json_str)
 
 @app.route('/')
 def home():
@@ -138,7 +81,7 @@ def admin():
         <title>Admin - Boletín de Trazabilidad</title>
         <meta charset="UTF-8">
         <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
             .upload-area { border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px 0; border-radius: 10px; }
             button { background: #007cba; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
             button:hover { background: #005a8b; }
@@ -146,8 +89,6 @@ def admin():
             .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
             .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
             .info { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; }
-            .debug { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
-            .json-preview { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
         </style>
     </head>
     <body>
@@ -167,12 +108,15 @@ def admin():
         <div style="margin-top: 30px;">
             <h3>Enlaces útiles:</h3>
             <p><a href="/api/datos" target="_blank">Ver datos JSON</a></p>
-            <p><a href="/api/datos/compressed" target="_blank">Ver datos comprimidos</a></p>
-            <p><a href="/api/debug" target="_blank">Debug info</a></p>
-            <p><a href="/api/stats" target="_blank">Estadísticas</a></p>
+            <p><a href="/api/test" target="_blank">Test de funcionalidad</a></p>
+            <p><strong>URL del API:</strong><br>
+            <code id="api-url"></code></p>
         </div>
         
         <script>
+            // Mostrar la URL actual
+            document.getElementById('api-url').textContent = window.location.origin + '/api/datos';
+            
             function subirArchivo() {
                 const fileInput = document.getElementById('fileInput');
                 const statusDiv = document.getElementById('status');
@@ -196,20 +140,13 @@ def admin():
                     if (data.error) {
                         statusDiv.innerHTML = `<div class="error">Error: ${data.error}</div>`;
                     } else {
-                        let html = `<div class="success">
+                        statusDiv.innerHTML = `<div class="success">
                             ✓ Archivo procesado exitosamente<br>
                             Fecha: ${data.fecha_actualizacion}<br>
                             TFN: ${data.total_tfn} registros<br>
                             TFN-CNCAF: ${data.total_tfn_cncaf} registros<br>
-                            TFN-CNCAF-CSJN: ${data.total_tfn_cncaf_csjn} registros<br>
-                            Tamaño del archivo: ${data.file_size_mb} MB
+                            TFN-CNCAF-CSJN: ${data.total_tfn_cncaf_csjn} registros
                         </div>`;
-                        
-                        if (data.sample_data) {
-                            html += `<div class="debug">Muestra de datos procesados:<br>${JSON.stringify(data.sample_data, null, 2)}</div>`;
-                        }
-                        
-                        statusDiv.innerHTML = html;
                         fileInput.value = '';
                     }
                 })
@@ -236,54 +173,30 @@ def subir_archivo():
         if not archivo.filename.endswith(('.xlsx', '.xls')):
             return jsonify({'error': 'Solo se permiten archivos Excel (.xlsx, .xls)'}), 400
         
-        print(f"Procesando archivo: {archivo.filename}")
+        print(f"Procesando archivo: {archivo.filename}")  # Log para Render
         
         # Procesar Excel
         datos = leer_excel_y_convertir(archivo)
         
-        # Calcular tamaño del JSON
-        json_str = json.dumps(datos, ensure_ascii=False, indent=2)
-        json_size_mb = len(json_str.encode('utf-8')) / (1024 * 1024)
+        print(f"Datos procesados - TFN: {len(datos['tfn'])}, TFN_CNCAF: {len(datos['tfn_cncaf'])}, TFN_CNCAF_CSJN: {len(datos['tfn_cncaf_csjn'])}")
         
-        print(f"Tamaño del JSON: {json_size_mb:.2f} MB")
-        
-        # Guardar datos normales
+        # Guardar en archivo JSON
         with open(DATOS_FILE, 'w', encoding='utf-8') as f:
             json.dump(datos, f, ensure_ascii=False, indent=2)
         
-        # Guardar versión comprimida también
-        compressed_data = comprimir_datos(datos)
-        with open(DATOS_FILE + '.compressed', 'w', encoding='utf-8') as f:
-            f.write(compressed_data)
-        
-        print("Archivos guardados exitosamente")
-        
-        # Crear muestra de datos para debug
-        sample_data = {}
-        for key, value in datos.items():
-            if key != 'fecha_actualizacion' and isinstance(value, list) and len(value) > 0:
-                sample_data[key] = {
-                    'primer_registro': value[0] if value else None,
-                    'total_registros': len(value)
-                }
+        print("Archivo JSON guardado correctamente")
         
         # Respuesta con estadísticas
-        response_data = {
+        return jsonify({
             'mensaje': 'Archivo procesado exitosamente',
             'fecha_actualizacion': datos['fecha_actualizacion'],
             'total_tfn': len(datos['tfn']),
             'total_tfn_cncaf': len(datos['tfn_cncaf']),
-            'total_tfn_cncaf_csjn': len(datos['tfn_cncaf_csjn']),
-            'file_size_mb': round(json_size_mb, 2),
-            'sample_data': sample_data
-        }
-        
-        return jsonify(response_data)
+            'total_tfn_cncaf_csjn': len(datos['tfn_cncaf_csjn'])
+        })
         
     except Exception as e:
-        print(f"Error en subir_archivo: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error en subir_archivo: {str(e)}")  # Log para debugging
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/datos')
@@ -302,80 +215,40 @@ def obtener_datos():
         print(f"Error en obtener_datos: {str(e)}")
         return jsonify({'error': f'Error cargando datos: {str(e)}'}), 500
 
-@app.route('/api/datos/compressed')
-def obtener_datos_comprimidos():
-    """Endpoint que devuelve los datos comprimidos"""
-    try:
-        compressed_file = DATOS_FILE + '.compressed'
-        if not os.path.exists(compressed_file):
-            return jsonify({'error': 'No hay datos comprimidos disponibles.'}), 404
-        
-        with open(compressed_file, 'r', encoding='utf-8') as f:
-            compressed_data = f.read()
-        
-        datos = descomprimir_datos(compressed_data)
-        return jsonify(datos)
-        
-    except Exception as e:
-        print(f"Error en obtener_datos_comprimidos: {str(e)}")
-        return jsonify({'error': f'Error cargando datos comprimidos: {str(e)}'}), 500
-
-@app.route('/api/stats')
-def obtener_estadisticas():
-    """Endpoint que devuelve solo estadísticas sin los datos completos"""
-    try:
-        if not os.path.exists(DATOS_FILE):
-            return jsonify({'error': 'No hay datos disponibles.'}), 404
-        
-        with open(DATOS_FILE, 'r', encoding='utf-8') as f:
-            datos = json.load(f)
-        
-        # Solo devolver estadísticas y primeros registros
-        stats = {
-            'fecha_actualizacion': datos.get('fecha_actualizacion'),
-            'total_tfn': len(datos.get('tfn', [])),
-            'total_tfn_cncaf': len(datos.get('tfn_cncaf', [])),
-            'total_tfn_cncaf_csjn': len(datos.get('tfn_cncaf_csjn', [])),
-            'muestra_tfn': datos.get('tfn', [])[:2],  # Solo primeros 2 registros
-            'muestra_tfn_cncaf': datos.get('tfn_cncaf', [])[:2],
-            'muestra_tfn_cncaf_csjn': datos.get('tfn_cncaf_csjn', [])[:2]
-        }
-        
-        return jsonify(stats)
-        
-    except Exception as e:
-        return jsonify({'error': f'Error cargando estadísticas: {str(e)}'}), 500
-
-@app.route('/api/debug')
-def debug_info():
-    """Endpoint para debugging"""
-    info = {
-        'archivo_existe': os.path.exists(DATOS_FILE),
-        'archivo_comprimido_existe': os.path.exists(DATOS_FILE + '.compressed'),
-        'directorio_actual': os.getcwd(),
-        'archivos_en_directorio': os.listdir('.'),
-        'python_version': os.sys.version,
-        'render_environment': 'RENDER' in os.environ
+@app.route('/api/test')
+def test():
+    """Endpoint para probar que todo funciona"""
+    test_info = {
+        'status': 'OK',
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'datos_file_exists': os.path.exists(DATOS_FILE),
+        'current_directory': os.getcwd(),
+        'files_in_directory': os.listdir('.') if os.path.exists('.') else [],
+        'environment': 'RENDER' if 'RENDER' in os.environ else 'LOCAL'
     }
     
     if os.path.exists(DATOS_FILE):
+        file_size = os.path.getsize(DATOS_FILE)
+        test_info['datos_file_size_bytes'] = file_size
+        test_info['datos_file_size_mb'] = round(file_size / (1024 * 1024), 2)
+        
         try:
-            file_size = os.path.getsize(DATOS_FILE)
-            info['archivo_size_mb'] = round(file_size / (1024 * 1024), 2)
-            
             with open(DATOS_FILE, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
-            info['datos_stats'] = {
-                'fecha_actualizacion': datos.get('fecha_actualizacion', 'N/A'),
-                'tfn_count': len(datos.get('tfn', [])),
-                'tfn_cncaf_count': len(datos.get('tfn_cncaf', [])),
-                'tfn_cncaf_csjn_count': len(datos.get('tfn_cncaf_csjn', []))
+            test_info['data_summary'] = {
+                'fecha_actualizacion': datos.get('fecha_actualizacion'),
+                'tfn_records': len(datos.get('tfn', [])),
+                'tfn_cncaf_records': len(datos.get('tfn_cncaf', [])),
+                'tfn_cncaf_csjn_records': len(datos.get('tfn_cncaf_csjn', []))
             }
         except Exception as e:
-            info['error_leyendo_datos'] = str(e)
+            test_info['error_reading_data'] = str(e)
     
-    return jsonify(info)
+    return jsonify(test_info)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    # Configuración para Render
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
