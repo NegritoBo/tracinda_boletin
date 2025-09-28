@@ -12,9 +12,13 @@ CORS(app)
 DATOS_FILE = 'datos.json'
 
 def leer_excel_y_convertir(archivo_excel):
-    """Convierte el Excel a formato JSON usando openpyxl"""
+    """Convierte el Excel a formato JSON usando openpyxl - VERSIÓN MEJORADA"""
     try:
-        workbook = openpyxl.load_workbook(archivo_excel)
+        # Guardar archivo temporalmente
+        temp_path = "temp_excel.xlsx"
+        archivo_excel.save(temp_path)
+        
+        workbook = openpyxl.load_workbook(temp_path, data_only=True)
         
         datos = {
             'fecha_actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -37,25 +41,42 @@ def leer_excel_y_convertir(archivo_excel):
                 # Leer headers (primera fila)
                 headers = []
                 for cell in sheet[1]:
-                    headers.append(cell.value or '')
+                    header_value = str(cell.value) if cell.value is not None else f'columna_{len(headers) + 1}'
+                    headers.append(header_value)
                 
                 # Leer datos (desde fila 2 en adelante)
                 sheet_data = []
                 for row in sheet.iter_rows(min_row=2, values_only=True):
-                    if any(cell for cell in row if cell):  # Si la fila tiene datos
+                    if any(cell is not None and cell != '' for cell in row):
                         row_dict = {}
                         for i, value in enumerate(row):
-                            if i < len(headers) and headers[i]:
-                                row_dict[headers[i]] = str(value) if value is not None else ''
-                        if row_dict:  # Solo agregar si tiene datos
+                            if i < len(headers):
+                                if value is None:
+                                    cleaned_value = ''
+                                else:
+                                    cleaned_value = str(value)
+                                    # Mantener formato original, solo limpiar básico
+                                    cleaned_value = cleaned_value.replace('\r\n', ' ').replace('\n', ' ')
+                                row_dict[headers[i]] = cleaned_value
+                        
+                        if row_dict:
                             sheet_data.append(row_dict)
                 
                 datos[data_key] = sheet_data
         
+        # Limpiar archivo temporal
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
         return datos
         
     except Exception as e:
+        # Limpiar archivo temporal en caso de error
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
         raise Exception(f"Error procesando Excel: {str(e)}")
+
+# ... (el resto del código IGUAL que tu versión original que funcionaba en tu PC)
 
 @app.route('/')
 def home():
@@ -99,7 +120,7 @@ def admin():
             <h3>Enlaces útiles:</h3>
             <p><a href="/api/datos" target="_blank">Ver datos JSON</a></p>
             <p><strong>URL del boletín para empleados:</strong><br>
-            <code>https://TU-USUARIO.github.io/TU-REPOSITORIO</code></p>
+            <code>https://tracinda-boletin.onrender.com/api/datos</code></p>
         </div>
         
         <script>
@@ -194,5 +215,5 @@ def obtener_datos():
         return jsonify({'error': f'Error cargando datos: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 10000))
     app.run(debug=False, host='0.0.0.0', port=port)
